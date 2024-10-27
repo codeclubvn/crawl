@@ -21,13 +21,14 @@ type ICompanyUseCase interface {
 }
 
 type companyUseCase struct {
-	companyScrap      *trangvangvietnam.ICompanyCrawl
+	companyScrap      trangvangvietnam.ICompanyCrawl
 	companyRepository repository.ICompanyRepository
 	contextTimeout    time.Duration
 }
 
-func NewCompanyUseCase(companyRepository repository.ICompanyRepository, contextTimeout time.Duration) ICompanyUseCase {
-	return &companyUseCase{companyRepository: companyRepository, contextTimeout: contextTimeout}
+func NewCompanyUseCase(companyRepository repository.ICompanyRepository, contextTimeout time.Duration,
+	companyScrap trangvangvietnam.ICompanyCrawl) ICompanyUseCase {
+	return &companyUseCase{companyRepository: companyRepository, contextTimeout: contextTimeout, companyScrap: companyScrap}
 }
 
 func (c *companyUseCase) CreateOne(ctx context.Context, page []string) error {
@@ -35,24 +36,23 @@ func (c *companyUseCase) CreateOne(ctx context.Context, page []string) error {
 	defer cancel()
 
 	currentUrl := page[0]
-	companies := *c.companyScrap
-	err := companies.GetByTotalPages(currentUrl)
+	err := c.companyScrap.GetByTotalPages(currentUrl)
 	if err != nil {
 		return err
 	}
 
-	err = companies.GetByURL(currentUrl)
+	err = c.companyScrap.GetByURL(currentUrl)
 	if err != nil {
 		return err
 	}
 
-	err = companies.GetAll(currentUrl)
+	err = c.companyScrap.GetAll(currentUrl)
 	if err != nil {
 		return err
 	}
 
-	company, err := json.Marshal(c.companyScrap) // Chuyển kiểu dữ liệu Ebooks sang JSON
-	err = os.WriteFile("output.json", company, 0644)
+	companies, err := json.Marshal(c.companyScrap) // Chuyển kiểu dữ liệu Ebooks sang JSON
+	err = os.WriteFile("output.json", companies, 0644)
 
 	return nil
 }

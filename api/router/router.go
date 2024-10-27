@@ -4,7 +4,9 @@ import (
 	"crawl/api/controller"
 	"crawl/api/middleware"
 	"crawl/docs"
+	"crawl/domain"
 	"crawl/initialization"
+	"crawl/pkg/crawl_data/goquery/trangvangvietnam"
 	"crawl/repository"
 	"crawl/usecase"
 	"fmt"
@@ -75,9 +77,12 @@ func SwaggerRouter(env *initialization.Database, timeout time.Duration, db *mong
 }
 
 func CompanyRouter(env *initialization.Database, timeout time.Duration, db *mongo.Database, group *gin.RouterGroup, cacheTTL time.Duration) {
+	var companies domain.Companies
+
 	co := repository.NewCompanyRepository("company", db)
+	sc := trangvangvietnam.NewCompaniesCrawl(companies)
 	company := &controller.CompanyController{
-		CompanyUseCase: usecase.NewCompanyUseCase(co, timeout),
+		CompanyUseCase: usecase.NewCompanyUseCase(co, timeout, sc),
 		Database:       env,
 	}
 
