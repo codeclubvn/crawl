@@ -7,8 +7,8 @@ import (
 
 type Config struct {
 	MongoURL string `env:"MONGO_URL" envDefault:"mongodb://localhost:27017"`
-	Port     string `env:"PORT" envDefault:"8083"`
-	DBName   string `env:"DB_NAME" envDefault:"test_db"`
+	Port     string `env:"PORT" envDefault:"8002"`
+	DBName   string `env:"DB_NAME" envDefault:"crawl"`
 }
 
 var cfg Config
