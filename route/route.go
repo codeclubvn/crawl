@@ -17,17 +17,19 @@ func NewService() *Service {
 	}
 
 	db := s.GetDB()
-	repo := repo.NewRepo(db)
+	rp := repo.NewRepo(db)
 
-	userService := service.NewUser(repo)
-	user := handler.NewUser(userService)
+	crawlService := service.NewCrawl(rp)
+	crawl := handler.NewCrawl(crawlService)
 	health := handler.NewHealth()
 
 	router := s.Router
 	v1 := router.Group("/v1")
 
-	// user
-	v1.POST("/login", user.Login)
+	// crawl
+	v1.POST("/crawl/trang-vang", crawl.CrawlYellowPage)
+	v1.GET("company/get-one", crawl.GetOne)
+	v1.GET("company/get-list", crawl.GetList)
 	router.POST("/check-health", health.CheckHealth)
 
 	return &s

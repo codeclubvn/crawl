@@ -2,6 +2,7 @@ package repo
 
 import (
 	"crawl/model"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -16,5 +17,7 @@ func NewRepo(db *mongo.Database) *Repo {
 }
 
 type IRepo interface {
-	GetUserByName(name string) (model.User, error)
+	CreateBulk(input []model.CompanyInfo) (err error)
+	GetOne(filter bson.M) (model.CompanyInfo, error)
+	GetList(filter bson.M, limit int64, skip int64) ([]model.CompanyInfo, error)
 }
