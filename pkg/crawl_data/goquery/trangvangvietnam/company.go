@@ -2,11 +2,16 @@ package trangvangvietnam
 
 import (
 	"crawl/domain"
+	"encoding/json"
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
+	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
+	"net/http"
+	"os"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 type CompanyScraping struct {
@@ -24,46 +29,108 @@ func NewCompaniesCrawl(companies domain.Companies) ICompanyCrawl {
 }
 
 func (c *CompanyScraping) GetByURL(url string) error {
-	doc, err := goquery.NewDocument(url)
+	// Gửi yêu cầu HTTP tới URL
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// Tạo tài liệu từ phản hồi
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
 		return err
 	}
 
-	doc.Find(".div_list_city").Each(func(i int, s *goquery.Selection) {
-		name, _ := s.Find(".listings_center a").Attr("title")
-		imageURL, _ := s.Find(".listings_center a").Attr("href")
-		phone, _ := s.Find(".listing_dienthoai i a").Attr("title")
-		branch, _ := s.Find("span.nganh_listing_txt").Attr("title")
-		mobile, _ := s.Find("span.fw500 a").Attr("title")
-		description, _ := s.Find("div.div_textqc > small").Attr("")
-		company := domain.Company{
-			Name:        name,
-			Branch:      branch,
-			Phone:       phone,
-			Mobile:      mobile,
-			Description: description,
-			ImageURL:    imageURL,
+	// Mutex để bảo vệ truy cập vào c.companies.List trong môi trường đa luồng
+	var mu sync.Mutex
+
+	// Duyệt qua từng công ty trong danh sách
+	doc.Find(".w-100.h-auto.shadow.rounded-3.bg-white.p-2.mb-3").Each(func(i int, s *goquery.Selection) {
+		// Tên công ty
+		name := s.Find(".listings_center h2 a").Text()
+
+		// Đường dẫn trang công ty
+		companyURL, exists := s.Find(".listings_center h2 a").Attr("href")
+		if !exists {
+			companyURL = "" // Gán giá trị rỗng nếu không tìm thấy
 		}
 
+		// Ngành nghề
+		branch := s.Find("span.nganh_listing_txt").Text()
+
+		// Địa chỉ
+		address := s.Find(".logo_congty_diachi .fa-location-dot").Parent().Text()
+
+		// Số điện thoại
+		phone := s.Find(".listing_dienthoai a").Text()
+
+		// Hotline
+		hotline := s.Find("span.fw500 a").Text()
+
+		// Mô tả
+		description := s.Find("div.div_textqc > small").Text()
+
+		// URL hình ảnh logo công ty
+		imageURL, exists := s.Find(".logo_congty img").Attr("src")
+		if !exists {
+			imageURL = "" // Gán giá trị rỗng nếu không tìm thấy
+		}
+
+		// Tạo đối tượng Company và thêm vào danh sách
+		company := domain.Company{
+			Name:        name,
+			Address:     address,
+			Branch:      branch,
+			Phone:       phone,
+			Mobile:      hotline,
+			Description: description,
+			ImageURL:    imageURL,
+			CompanyURL:  companyURL,
+		}
+
+		mu.Lock()
 		c.companies.TotalCompanies++
 		c.companies.List = append(c.companies.List, company)
+		mu.Unlock()
 	})
 
 	return nil
 }
 
 func (c *CompanyScraping) GetByTotalPages(url string) error {
-	doc, err := goquery.NewDocument(url)
+	// Gửi yêu cầu HTTP đến URL
+	resp, err := http.Get(url)
 	if err != nil {
 		return err
 	}
-	lastPageLink, _ := doc.Find("paging").Attr("href") // Đọc dữ liệu từ thẻ a của ul.pagination
-	if lastPageLink == "javascript:void();" {          // Trường hợp chỉ có 1 page thì sẽ không có url
+	defer resp.Body.Close()
+
+	// Tạo tài liệu từ phản hồi
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	// Tìm liên kết của trang cuối trong phần phân trang
+	lastPageLink, exists := doc.Find("div#paging a").Eq(-2).Attr("href") // Lấy phần tử áp chót để tránh nút "Tiếp"
+	if !exists || lastPageLink == "#" {                                  // Trường hợp chỉ có 1 trang hoặc không có phân trang
 		c.companies.TotalPages = 1
 		return nil
 	}
+
+	// Tách số trang từ URL cuối
 	split := strings.Split(lastPageLink, "?page=")
-	totalPages, _ := strconv.Atoi(split[1])
+	if len(split) < 2 {
+		return fmt.Errorf("could not parse the total pages from URL: %s", lastPageLink)
+	}
+
+	totalPages, err := strconv.Atoi(split[1])
+	if err != nil {
+		return fmt.Errorf("invalid page number in URL %s: %w", lastPageLink, err)
+	}
+
+	// Gán tổng số trang vào `c.companies.TotalPages`
 	c.companies.TotalPages = totalPages
 	return nil
 }
@@ -72,20 +139,31 @@ func (c *CompanyScraping) GetAll(currentUrl string) error {
 	eg := errgroup.Group{}
 	if c.companies.TotalPages > 0 {
 		for i := 1; i <= c.companies.TotalPages; i++ {
+			// Lưu giá trị của uri cho mỗi lần lặp để tránh bị ghi đè
 			uri := fmt.Sprintf("%v?page=%v", currentUrl, i)
-			// https://golang.org/doc/faq#closures_and_goroutines
-			eg.Go(func() error {
-				err := c.GetByURL(uri)
-				if err != nil {
-					return err
+			eg.Go(func(uri string) func() error {
+				return func() error {
+					return c.GetByURL(uri)
 				}
-				return nil
-			})
+			}(uri))
 		}
+		// Chờ tất cả các goroutines hoàn thành
 		if err := eg.Wait(); err != nil {
 			return err
 		}
 	}
-	
+
+	// Marshal dữ liệu sau khi tất cả goroutines hoàn thành
+	companies, err := json.Marshal(c.companies)
+	if err != nil {
+		return errors.Errorf("failed to marshal company data: %w", err)
+	}
+
+	// Ghi dữ liệu JSON vào file
+	err = os.WriteFile("output.json", companies, 0644)
+	if err != nil {
+		return errors.Errorf("failed to write company data to file: %w", err)
+	}
+
 	return nil
 }

@@ -1,15 +1,14 @@
 package domain
 
-import "go.mongodb.org/mongo-driver/bson/primitive"
-
 type Company struct {
-	ID          primitive.ObjectID `bson:"_id" json:"_id"`
-	Name        string             `bson:"name" json:"name"`
-	Branch      string             `bson:"branch" json:"branch"`
-	Phone       string             `bson:"phone" json:"phone"`
-	Mobile      string             `bson:"mobile" json:"mobile"`
-	Description string             `bson:"description" json:"description"`
-	ImageURL    string             `bson:"imageURL" json:"imageURL"`
+	Name        string `bson:"name" json:"name"`
+	Address     string `bson:"address" json:"address"`
+	Branch      string `bson:"branch" json:"branch"`
+	Phone       string `bson:"phone" json:"phone"`
+	Mobile      string `bson:"mobile" json:"mobile"`
+	Description string `bson:"description" json:"description"`
+	ImageURL    string `bson:"imageURL" json:"imageURL"`
+	CompanyURL  string `bson:"companyURL" json:"companyURL"`
 }
 
 type Companies struct {

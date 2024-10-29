@@ -5,9 +5,8 @@ import (
 	"crawl/domain"
 	"crawl/pkg/crawl_data/goquery/trangvangvietnam"
 	"crawl/repository"
-	"encoding/json"
+	"github.com/pkg/errors"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"os"
 	"time"
 )
 
@@ -36,23 +35,21 @@ func (c *companyUseCase) CreateOne(ctx context.Context, page []string) error {
 	defer cancel()
 
 	currentUrl := page[0]
-	err := c.companyScrap.GetByTotalPages(currentUrl)
-	if err != nil {
-		return err
+
+	// Lấy tổng số trang nếu có hàm GetByTotalPages
+	if err := c.companyScrap.GetByTotalPages(currentUrl); err != nil {
+		return errors.Wrap(err, "failed to get total pages")
 	}
 
-	err = c.companyScrap.GetByURL(currentUrl)
-	if err != nil {
-		return err
+	// Lấy thông tin từng công ty từ URL
+	if err := c.companyScrap.GetByURL(currentUrl); err != nil {
+		return errors.Wrap(err, "failed to get company info by URL")
 	}
 
-	err = c.companyScrap.GetAll(currentUrl)
-	if err != nil {
-		return err
+	// Lấy toàn bộ dữ liệu cần thiết
+	if err := c.companyScrap.GetAll(currentUrl); err != nil {
+		return errors.Wrap(err, "failed to get all company info")
 	}
-
-	companies, err := json.Marshal(c.companyScrap) // Chuyển kiểu dữ liệu Ebooks sang JSON
-	err = os.WriteFile("output.json", companies, 0644)
 
 	return nil
 }
