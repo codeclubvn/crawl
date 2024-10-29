@@ -1,11 +1,12 @@
-package trangvangvietnam
+package crawl_data
 
 import (
+	"context"
 	"crawl/domain"
+	"crawl/repository"
 	"encoding/json"
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
-	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 	"net/http"
 	"os"
@@ -15,7 +16,8 @@ import (
 )
 
 type CompanyScraping struct {
-	companies domain.Companies
+	companies         domain.Companies
+	companyRepository repository.ICompanyRepository
 }
 
 type ICompanyCrawl interface {
@@ -24,8 +26,8 @@ type ICompanyCrawl interface {
 	GetAll(currentUrl string) error
 }
 
-func NewCompaniesCrawl(companies domain.Companies) ICompanyCrawl {
-	return &CompanyScraping{companies: companies}
+func NewCompaniesCrawl(companies domain.Companies, companyRepository repository.ICompanyRepository) ICompanyCrawl {
+	return &CompanyScraping{companies: companies, companyRepository: companyRepository}
 }
 
 func (c *CompanyScraping) GetByURL(url string) error {
@@ -147,23 +149,44 @@ func (c *CompanyScraping) GetAll(currentUrl string) error {
 				}
 			}(uri))
 		}
+
 		// Chờ tất cả các goroutines hoàn thành
 		if err := eg.Wait(); err != nil {
 			return err
 		}
 	}
 
+	// Tạo dữ liệu để ghi vào file
+	companyData := domain.Companies{
+		TotalPages:     c.companies.TotalPages,
+		TotalCompanies: c.companies.TotalCompanies,
+		List:           c.companies.List,
+	}
+
+	var egInsert errgroup.Group
+	for _, company := range c.companies.List {
+		company := company // Tạo bản sao của company để tránh vấn đề với goroutine
+		egInsert.Go(func() error {
+			err := c.companyRepository.CreateOne(context.Background(), &company)
+			return err
+		})
+	}
+
+	// Chờ tất cả các goroutines hoàn thành
+	if err := egInsert.Wait(); err != nil {
+		return fmt.Errorf("failed to insert companies into MongoDB: %w", err)
+	}
+
 	// Marshal dữ liệu sau khi tất cả goroutines hoàn thành
-	companies, err := json.Marshal(c.companies)
+	companiesData, err := json.Marshal(companyData)
 	if err != nil {
-		return errors.Errorf("failed to marshal company data: %w", err)
+		return fmt.Errorf("failed to marshal company data: %w", err)
 	}
 
 	// Ghi dữ liệu JSON vào file
-	err = os.WriteFile("output.json", companies, 0644)
+	err = os.WriteFile("output.json", companiesData, 0644)
 	if err != nil {
-		return errors.Errorf("failed to write company data to file: %w", err)
+		return fmt.Errorf("failed to write company data to file: %w", err)
 	}
-
 	return nil
 }

@@ -36,3 +36,27 @@ func (b *CompanyController) CreateOne(ctx *gin.Context) {
 		"status": "success",
 	})
 }
+
+// GetAll retrieves the Company's information
+// @Summary Get Company Information
+// @Description Retrieves the Company's information
+// @Tags Company
+// @Accept  json
+// @Produce  json
+// @Router /api/v1/companies/get/all [get]
+// @Security CookieAuth
+func (b *CompanyController) GetAll(ctx *gin.Context) {
+	data, err := b.CompanyUseCase.GetAll(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"status":  "error",
+			"message": err.Error(),
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"status": "success",
+		"data":   data,
+	})
+}

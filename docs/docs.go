@@ -35,6 +35,27 @@ const docTemplate = `{
                 "summary": "Create Company Information",
                 "responses": {}
             }
+        },
+        "/api/v1/companies/get/all": {
+            "get": {
+                "security": [
+                    {
+                        "CookieAuth": []
+                    }
+                ],
+                "description": "Retrieves the Company's information",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Company"
+                ],
+                "summary": "Get Company Information",
+                "responses": {}
+            }
         }
     }
 }`

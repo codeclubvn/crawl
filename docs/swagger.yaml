@@ -14,4 +14,17 @@ paths:
       summary: Create Company Information
       tags:
       - Company
+  /api/v1/companies/get/all:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves the Company's information
+      produces:
+      - application/json
+      responses: {}
+      security:
+      - CookieAuth: []
+      summary: Get Company Information
+      tags:
+      - Company
 swagger: "2.0"

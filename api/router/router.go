@@ -6,7 +6,7 @@ import (
 	"crawl/docs"
 	"crawl/domain"
 	"crawl/initialization"
-	"crawl/pkg/crawl_data/goquery/trangvangvietnam"
+	"crawl/pkg/crawl_data"
 	"crawl/repository"
 	"crawl/usecase"
 	"fmt"
@@ -80,7 +80,8 @@ func CompanyRouter(env *initialization.Database, timeout time.Duration, db *mong
 	var companies domain.Companies
 
 	co := repository.NewCompanyRepository("company", db)
-	sc := trangvangvietnam.NewCompaniesCrawl(companies)
+	sc := crawl_data.NewCompaniesCrawl(companies, co)
+
 	company := &controller.CompanyController{
 		CompanyUseCase: usecase.NewCompanyUseCase(co, timeout, sc),
 		Database:       env,
@@ -88,4 +89,5 @@ func CompanyRouter(env *initialization.Database, timeout time.Duration, db *mong
 
 	router := group.Group("/companies")
 	router.POST("/create", company.CreateOne)
+	router.GET("/get/all", company.GetAll)
 }

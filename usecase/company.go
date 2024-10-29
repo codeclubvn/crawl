@@ -3,7 +3,7 @@ package usecase
 import (
 	"context"
 	"crawl/domain"
-	"crawl/pkg/crawl_data/goquery/trangvangvietnam"
+	"crawl/pkg/crawl_data"
 	"crawl/repository"
 	"github.com/pkg/errors"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -20,13 +20,13 @@ type ICompanyUseCase interface {
 }
 
 type companyUseCase struct {
-	companyScrap      trangvangvietnam.ICompanyCrawl
+	companyScrap      crawl_data.ICompanyCrawl
 	companyRepository repository.ICompanyRepository
 	contextTimeout    time.Duration
 }
 
 func NewCompanyUseCase(companyRepository repository.ICompanyRepository, contextTimeout time.Duration,
-	companyScrap trangvangvietnam.ICompanyCrawl) ICompanyUseCase {
+	companyScrap crawl_data.ICompanyCrawl) ICompanyUseCase {
 	return &companyUseCase{companyRepository: companyRepository, contextTimeout: contextTimeout, companyScrap: companyScrap}
 }
 
@@ -75,6 +75,8 @@ func (c *companyUseCase) GetByName(ctx context.Context, name string) (*domain.Co
 }
 
 func (c *companyUseCase) GetAll(ctx context.Context) ([]domain.Company, error) {
-	//TODO implement me
-	panic("implement me")
+	ctx, cancel := context.WithTimeout(ctx, c.contextTimeout)
+	defer cancel()
+
+	return c.companyRepository.GetAll(ctx)
 }
